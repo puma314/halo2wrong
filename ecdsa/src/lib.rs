@@ -1,8 +1,10 @@
 pub mod ecdsa;
+pub mod ecdsa_circuit;
 
-pub(crate) use ecc::halo2;
+pub use ecc::halo2;
 pub(crate) use ecc::integer;
 pub(crate) use ecc::maingate;
+pub use halo2::halo2curves as curves;
 
-#[cfg(test)]
-use halo2::halo2curves as curves;
+// #[cfg(test)]
+// pub use halo2::halo2curves as curves;
