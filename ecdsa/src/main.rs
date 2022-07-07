@@ -20,6 +20,8 @@ use halo2::poly::commitment::{CommitmentScheme, ParamsProver, Prover as _Prover}
 use halo2::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
 // use halo2::poly::kzg::strategy::AccumulatorStrategy;
 use ecdsa::curves::bn256::Bn256;
+use std::time::{Duration, Instant};
+
 
 fn mod_n<C: CurveAffine>(x: C::Base) -> C::Scalar {
     let x_big = fe_to_big(x);
@@ -28,6 +30,8 @@ fn mod_n<C: CurveAffine>(x: C::Base) -> C::Scalar {
 
 fn run<C: CurveAffine, N: FieldExt>() {
     println!("At top of run function");
+    // use ecdsa::curves::bn256::Fr as BnScalar;
+    // let C = BnScalar;
     let g = C::generator();
 
     // Generate a key pair
@@ -68,25 +72,35 @@ fn run<C: CurveAffine, N: FieldExt>() {
 
     let k = 20;
     let aux_generator = C::CurveExt::random(OsRng).to_affine();
-    let circuit = TestCircuitEcdsaVerify::<C, N> {
-        public_key: Value::known(public_key),
-        signature: Value::known((r, s)),
-        msg_hash: Value::known(msg_hash),
 
-        aux_generator,
-        window_size: 2,
-        _marker: PhantomData,
-    };
+    let do_mock_proof = true;
+    if (do_mock_proof) {
+        let start = Instant::now();
+        let circuit = TestCircuitEcdsaVerify::<C, N> {
+            public_key: Value::known(public_key),
+            signature: Value::known((r, s)),
+            msg_hash: Value::known(msg_hash),
+    
+            aux_generator,
+            window_size: 2,
+            _marker: PhantomData,
+        };
+    
+        let public_inputs = vec![vec![]];
+        let prover = match MockProver::run(k, &circuit, public_inputs) {
+            Ok(prover) => prover,
+            Err(e) => panic!("{:#?}", e),
+        };
+        println!("Done with mock prover.");
+        let duration = start.elapsed();
+        println!("Time elapsed in generating proof with MockProver is: {:?}", duration);
+    
+        assert_eq!(prover.verify(), Ok(()));
+        println!("Prover verified.");
+        let duration = start.elapsed();
+        println!("Time elapsed in verifying proof with MockProver is: {:?}", duration);
 
-    let public_inputs = vec![vec![]];
-    let prover = match MockProver::run(k, &circuit, public_inputs) {
-        Ok(prover) => prover,
-        Err(e) => panic!("{:#?}", e),
-    };
-    println!("Done with mock prover.");
-
-    assert_eq!(prover.verify(), Ok(()));
-    println!("Prover verified.");
+    }
 
     // This is with the real prover
 
@@ -98,7 +112,9 @@ fn run<C: CurveAffine, N: FieldExt>() {
     //     window_size: 2,
     //     _marker: PhantomData,
     // };
-    const K: u32 = 5;
+    let start = Instant::now();
+
+    const K: u32 = 20;
     type Scheme = KZGCommitmentScheme<Bn256>;
     let params = ParamsKZG::<Bn256>::new(K);
     let rng = OsRng;
@@ -114,6 +130,8 @@ fn run<C: CurveAffine, N: FieldExt>() {
 
     let vk = keygen_vk::<Scheme, _>(&params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk::<Scheme, _>(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
+    let duration = start.elapsed();
+    println!("Time elapsed in generating vkey and pkey: {:?}", duration);
 
     // let proof = create_proof::<_, Blake2bWrite<_, _, Challenge255<_>>, ProverGWC<_>, _, _>(
     //     rng, &params, &pk,
@@ -136,20 +154,38 @@ fn run<C: CurveAffine, N: FieldExt>() {
     // )
     // .expect("proof generation should not fail");
 
-    let mut transcript = Blake2bWrite::<_, C, Challenge255<C>>::init(vec![]);
+    let filled_circuit: TestCircuitEcdsaVerify<C, <Scheme as CommitmentScheme>::Scalar> = TestCircuitEcdsaVerify {
+        public_key: Value::known(public_key),
+        signature: Value::known((r, s)),
+        msg_hash: Value::known(msg_hash),
+        aux_generator,
+        window_size: 2,
+        _marker: PhantomData,
+    };
+    let duration = start.elapsed();
+    println!("Time elapsed in filling circuit: {:?}", duration);
+    let mut transcript = Blake2bWrite::<_, <Scheme as CommitmentScheme>::Curve, Challenge255<_>>::init(vec![]);
     // Create a proof
+    // let public_inputs: [Scheme::Scalar] = vec![vec![]];
+    let array: [<Scheme as CommitmentScheme>::Scalar; 0] = [];
+
     create_proof::<_, ProverGWC<_>, _, _, _, _>(
         &params,
         &pk,
-        &[circuit.clone(), circuit.clone()],
+        &[filled_circuit.clone(), filled_circuit.clone()],
         // public_
-        &[&[&public_inputs], &[&public_inputs]],
+        &[&[&array], &[&array]],
         OsRng,
         &mut transcript,
     )
     .expect("proof generation should not fail");
+    let duration = start.elapsed();
+    println!("Time elapsed in generating proof with real prover: {:?}", duration);
 
     let proof: Vec<u8> = transcript.finalize();
+    println!("Done generating proof");
+    let duration = start.elapsed();
+    println!("Time elapsed in finalizing proof: {:?}", duration);
 
 
 }
