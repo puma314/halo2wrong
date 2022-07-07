@@ -34,7 +34,7 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
             Range::Unreduced => (0..NUMBER_OF_LIMBS)
                 .map(|i| {
                     Ok(AssignedLimb::from(
-                        main_gate.assign_value(ctx, &integer.limb(i))?,
+                        main_gate.assign_value(ctx, integer.limb(i))?,
                         self.rns.max_unreduced_limb.clone(),
                     ))
                 })
@@ -46,17 +46,24 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
                             // Most significant limb
                             if i == NUMBER_OF_LIMBS - 1 {
                                 AssignedLimb::from(
-                                    range_chip.range_value(
+                                    range_chip.assign(
                                         ctx,
-                                        &integer.limb(i),
+                                        integer.limb(i),
+                                        Self::sublimb_bit_len(),
                                         bit_len_limb_msb,
                                     )?,
                                     max_val_msb.clone(),
                                 )
+
                             // Rest
                             } else {
                                 AssignedLimb::from(
-                                    range_chip.range_value(ctx, &integer.limb(i), BIT_LEN_LIMB)?,
+                                    range_chip.assign(
+                                        ctx,
+                                        integer.limb(i),
+                                        Self::sublimb_bit_len(),
+                                        BIT_LEN_LIMB,
+                                    )?,
                                     max_val.clone(),
                                 )
                             },
