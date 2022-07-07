@@ -2,6 +2,7 @@ use ecdsa::ecdsa_circuit::TestCircuitEcdsaVerify;
 use ecdsa::halo2;
 use ecc::maingate::big_to_fe;
 use ecc::maingate::fe_to_big;
+use ecdsa::halo2::transcript::TranscriptWrite;
 use group::ff::Field;
 use group::{Curve, Group};
 use halo2::arithmetic::CurveAffine;
@@ -9,11 +10,16 @@ use halo2::arithmetic::FieldExt;
 use halo2::circuit::Value;
 use halo2::plonk::{create_proof, keygen_pk, keygen_vk, verify_proof};
 use halo2::poly::{commitment::Params};
-use halo2::transcript::{Blake2bRead, Blake2bWrite, Challenge255, EncodedChallenge};
+use halo2::transcript::{Blake2bRead, Blake2bWrite, Challenge255, EncodedChallenge, TranscriptWriterBuffer, TranscriptReadBuffer};
 use halo2::dev::MockProver;
 use rand_core::OsRng;
 use std::marker::PhantomData;
 use ecdsa::curves::pasta::{Eq, EqAffine};
+use halo2::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
+use halo2::poly::commitment::{CommitmentScheme, ParamsProver, Prover as _Prover};
+use halo2::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
+// use halo2::poly::kzg::strategy::AccumulatorStrategy;
+use ecdsa::curves::bn256::Bn256;
 
 fn mod_n<C: CurveAffine>(x: C::Base) -> C::Scalar {
     let x_big = fe_to_big(x);
@@ -84,7 +90,20 @@ fn run<C: CurveAffine, N: FieldExt>() {
 
     // This is with the real prover
 
-    let empty_circuit = TestCircuitEcdsaVerify::<C, N> {
+    // let empty_circuit = TestCircuitEcdsaVerify::<<KZGCommitmentScheme<Bn256> as Trait>::Scalar> {
+    //     public_key: Value::unknown(),
+    //     signature: Value::unknown(),
+    //     msg_hash: Value::unknown(),
+    //     aux_generator,
+    //     window_size: 2,
+    //     _marker: PhantomData,
+    // };
+    const K: u32 = 5;
+    type Scheme = KZGCommitmentScheme<Bn256>;
+    let params = ParamsKZG::<Bn256>::new(K);
+    let rng = OsRng;
+
+    let empty_circuit: TestCircuitEcdsaVerify<C, <Scheme as CommitmentScheme>::Scalar> = TestCircuitEcdsaVerify {
         public_key: Value::unknown(),
         signature: Value::unknown(),
         msg_hash: Value::unknown(),
@@ -92,15 +111,34 @@ fn run<C: CurveAffine, N: FieldExt>() {
         window_size: 2,
         _marker: PhantomData,
     };
-    const K: u32 = 5;
-    let params: Params<EqAffine> = Params::new(K);
-    let vk = keygen_vk(&params, &circuit).expect("keygen_vk should not fail");
-    let pk = keygen_pk(&params, vk, &circuit).expect("keygen_pk should not fail");
-    // alert("Line 56");
 
-    let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
+    let vk = keygen_vk::<Scheme, _>(&params, &empty_circuit).expect("keygen_vk should not fail");
+    let pk = keygen_pk::<Scheme, _>(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
+
+    // let proof = create_proof::<_, Blake2bWrite<_, _, Challenge255<_>>, ProverGWC<_>, _, _>(
+    //     rng, &params, &pk,
+    // );
+    // fn create_proof<
+    //     'params,
+    //     Scheme: CommitmentScheme,
+    //     TranscriptWrite: TranscriptWriterBuffer<Vec<u8>, Scheme::Curve, Ch>,
+    //     Prover: _Prover<'params, Scheme>,
+    //     Ch,
+    //     Rng,
+    // >
+    // create_plonk_proof::<Scheme, Prover, _, _, _, _>(
+    //     params,
+    //     pk,
+    //     &[circuit.clone(), circuit.clone()],
+    //     &[&[&[instance]], &[&[instance]]],
+    //     rng,
+    //     &mut transcript,
+    // )
+    // .expect("proof generation should not fail");
+
+    let mut transcript = Blake2bWrite::<_, C, Challenge255<C>>::init(vec![]);
     // Create a proof
-    create_proof(
+    create_proof::<_, ProverGWC<_>, _, _, _, _>(
         &params,
         &pk,
         &[circuit.clone(), circuit.clone()],
@@ -110,7 +148,6 @@ fn run<C: CurveAffine, N: FieldExt>() {
         &mut transcript,
     )
     .expect("proof generation should not fail");
-    // alert("Line 70");
 
     let proof: Vec<u8> = transcript.finalize();
 
