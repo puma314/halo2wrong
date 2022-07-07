@@ -9,7 +9,7 @@ use ecc::{EccConfig, GeneralEccChip};
 
 use halo2::arithmetic::CurveAffine;
 use halo2::arithmetic::FieldExt;
-use halo2::circuit::{Layouter, SimpleFloorPlanner};
+use halo2::circuit::{Layouter, SimpleFloorPlanner, Value};
 // use halo2::dev::MockProver;
 use halo2::plonk::{Circuit, ConstraintSystem, Error};
 use integer::{IntegerInstructions, NUMBER_OF_LOOKUP_LIMBS};
@@ -31,11 +31,17 @@ impl TestCircuitEcdsaVerifyConfig {
         let (rns_base, rns_scalar) =
             GeneralEccChip::<C, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>::rns();
         let main_gate_config = MainGate::<N>::configure(meta);
-        let mut overflow_bit_lengths: Vec<usize> = vec![];
-        overflow_bit_lengths.extend(rns_base.overflow_lengths());
-        overflow_bit_lengths.extend(rns_scalar.overflow_lengths());
-        let range_config =
-            RangeChip::<N>::configure(meta, &main_gate_config, overflow_bit_lengths);
+        let mut overflow_bit_lens: Vec<usize> = vec![];
+        overflow_bit_lens.extend(rns_base.overflow_lengths());
+        overflow_bit_lens.extend(rns_scalar.overflow_lengths());
+        let composition_bit_lens = vec![BIT_LEN_LIMB / NUMBER_OF_LIMBS];
+
+        let range_config = RangeChip::<N>::configure(
+            meta,
+            &main_gate_config,
+            composition_bit_lens,
+            overflow_bit_lens,
+        );
         TestCircuitEcdsaVerifyConfig {
             main_gate_config,
             range_config,
@@ -50,10 +56,9 @@ impl TestCircuitEcdsaVerifyConfig {
         &self,
         layouter: &mut impl Layouter<N>,
     ) -> Result<(), Error> {
-        let bit_len_lookup = BIT_LEN_LIMB / NUMBER_OF_LOOKUP_LIMBS;
-        let range_chip = RangeChip::<N>::new(self.range_config.clone(), bit_len_lookup);
-        range_chip.load_limb_range_table(layouter)?;
-        range_chip.load_overflow_range_tables(layouter)?;
+        let range_chip = RangeChip::<N>::new(self.range_config.clone());
+        range_chip.load_composition_tables(layouter)?;
+        range_chip.load_overflow_tables(layouter)?;
 
         Ok(())
     }
@@ -61,9 +66,9 @@ impl TestCircuitEcdsaVerifyConfig {
 
 #[derive(Default, Clone)]
 pub struct TestCircuitEcdsaVerify<E: CurveAffine, N: FieldExt> {
-    pub public_key: Option<E>,
-    pub signature: Option<(E::Scalar, E::Scalar)>,
-    pub msg_hash: Option<E::Scalar>,
+    pub public_key: Value<E>,
+    pub signature: Value<(E::Scalar, E::Scalar)>,
+    pub msg_hash: Value<E::Scalar>,
 
     pub aux_generator: E,
     pub window_size: usize,
@@ -98,7 +103,7 @@ impl<E: CurveAffine, N: FieldExt> Circuit<N> for TestCircuitEcdsaVerify<E, N> {
                 let offset = &mut 0;
                 let ctx = &mut RegionCtx::new(&mut region, offset);
 
-                ecc_chip.assign_aux_generator(ctx, Some(self.aux_generator))?;
+                ecc_chip.assign_aux_generator(ctx, Value::known(self.aux_generator))?;
                 ecc_chip.assign_aux(ctx, self.window_size, 1)?;
                 Ok(())
             },

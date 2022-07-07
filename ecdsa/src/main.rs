@@ -63,9 +63,9 @@ fn run<C: CurveAffine, N: FieldExt>() {
     let k = 20;
     let aux_generator = C::CurveExt::random(OsRng).to_affine();
     let circuit = TestCircuitEcdsaVerify::<C, N> {
-        public_key: Some(public_key),
-        signature: Some((r, s)),
-        msg_hash: Some(msg_hash),
+        public_key: Value::known(public_key),
+        signature: Value::known((r, s)),
+        msg_hash: Value::known(msg_hash),
 
         aux_generator,
         window_size: 2,
@@ -84,15 +84,14 @@ fn run<C: CurveAffine, N: FieldExt>() {
 
     // This is with the real prover
 
-    // let empty_circuit = TestCircuitEcdsaVerify::<C, N> {
-    //     public_key: Some(Value::unknown()),
-    //     signature: Value::unknown(),
-    //     msh_hash: Value::unknown(),
-    //     aux_generator: Value::unknown(),
-    //     window_size: Value::unknown(),
-    //     _marker: Value::unknown(),
-    // };
-    /*
+    let empty_circuit = TestCircuitEcdsaVerify::<C, N> {
+        public_key: Value::unknown(),
+        signature: Value::unknown(),
+        msg_hash: Value::unknown(),
+        aux_generator,
+        window_size: 2,
+        _marker: PhantomData,
+    };
     const K: u32 = 5;
     let params: Params<EqAffine> = Params::new(K);
     let vk = keygen_vk(&params, &circuit).expect("keygen_vk should not fail");
@@ -114,7 +113,7 @@ fn run<C: CurveAffine, N: FieldExt>() {
     // alert("Line 70");
 
     let proof: Vec<u8> = transcript.finalize();
-    */
+
 
 }
 
