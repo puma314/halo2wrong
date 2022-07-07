@@ -1,45 +1,4 @@
-// use crate::halo2;
-// use halo2::transcript::{Blake2bRead, Blake2bWrite, Challenge255, EncodedChallenge};
-// use halo2::plonk::{create_proof};
-// use halo2::poly::{commitment::Params, Rotation};
-// fn main() {
-//     println!("Hello, world!");
-
-//     // const K: u32 = 5;
-//     // let params: Params<EqAffine> = Params::new(K);
-
-//     // let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
-//     // // Create a proof
-//     // create_proof(
-//     //     &params,
-//     //     &pk,
-//     //     &[circuit.clone(), circuit.clone()],
-//     //     &[&[&[instance]], &[&[instance]]],
-//     //     OsRng,
-//     //     &mut transcript,
-//     // )
-//     // .expect("proof generation should not fail");
-//     // let proof: Vec<u8> = transcript.finalize();
-
-//     // std::fs::write("plonk_api_proof.bin", &proof[..])
-//     //     .expect("should succeed to write new proof");
-
-//     // // Check that a hardcoded proof is satisfied
-//     // let proof = include_bytes!("plonk_api_proof.bin");
-//     // let strategy = SingleVerifier::new(&params);
-//     // let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
-//     // assert!(verify_proof(
-//     //     &params,
-//     //     pk.get_vk(),
-//     //     strategy,
-//     //     &[&[&pubinputs[..]], &[&pubinputs[..]]],
-//     //     &mut transcript,
-//     // )
-//     // .is_ok());
-// }
-
 use ecdsa::ecdsa_circuit::TestCircuitEcdsaVerify;
-
 use ecdsa::halo2;
 use ecc::maingate::big_to_fe;
 use ecc::maingate::fe_to_big;
@@ -54,9 +13,7 @@ use halo2::transcript::{Blake2bRead, Blake2bWrite, Challenge255, EncodedChalleng
 use halo2::dev::MockProver;
 use rand_core::OsRng;
 use std::marker::PhantomData;
-// use halo2::pasta::{Eq, EqAffine};
 use ecdsa::curves::pasta::{Eq, EqAffine};
-
 
 fn mod_n<C: CurveAffine>(x: C::Base) -> C::Scalar {
     let x_big = fe_to_big(x);
@@ -134,9 +91,8 @@ fn run<C: CurveAffine, N: FieldExt>() {
     //     aux_generator: Value::unknown(),
     //     window_size: Value::unknown(),
     //     _marker: Value::unknown(),
-
     // };
-    // alert("Line 52");
+    /*
     const K: u32 = 5;
     let params: Params<EqAffine> = Params::new(K);
     let vk = keygen_vk(&params, &circuit).expect("keygen_vk should not fail");
@@ -158,6 +114,7 @@ fn run<C: CurveAffine, N: FieldExt>() {
     // alert("Line 70");
 
     let proof: Vec<u8> = transcript.finalize();
+    */
 
 }
 
